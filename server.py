@@ -1,34 +1,42 @@
 #!flask/bin/python
 import os
-from flask import Flask, jsonify, request, make_response
+from flask import Flask, jsonify, request
 import string
 import random
-
 import database
 
 
 try:
-    from flask.ext.cors import cross_origin
+    # The typical way to import flask-cors
+    from flask.ext.cors import CORS, cross_origin
 except ImportError:
-    from flask_cors import cross_origin
+    # Path hack allows examples to be run without installation.
+    import os
+    parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    os.sys.path.insert(0, parentdir)
+
+    from flask.ext.cors import CORS, cross_origin
+
 
 app = Flask(__name__)
 # configure a default header
-# we handle each route individually using @cross_origin()
-app.config['CORS_HEADERS'] = ['Authorization']
+app.config['CORS_ORIGINS'] = "*"
+app.config['CORS_HEADERS'] = ['Content-Type','Authorization']
+app.config['CORS_RESOURCES'] = {r"/api/*": {"origins": "*"}}
+cors = CORS(app)
+
 
 # flask url decorators
 seed_list = list(string.digits + string.uppercase)
 
 @app.route('/api/v2/user', methods=['POST'])
-@cross_origin()
 def create_new_user():
     unique_string = "".join([random.choice(seed_list) for _ in range(10)])
     database.save_new_user(unique_string)
     return jsonify({"token": unique_string})
 
+
 @app.route('/api/v2/rate', methods = ['POST'])
-@cross_origin()
 def get_next_recommendation():
     # we get a POST request from the client in JSON format
     # whose request body contains beer_id and beer_rating
@@ -43,7 +51,6 @@ def get_next_recommendation():
     return jsonify(database.get_metadata(recommended_beer_id))
 
 @app.route('/api/v1/<beer_id>', methods = ['GET'])
-@cross_origin()
 def get_similar_beer(beer_id):
     try:
         top_beer = database.get_nearest_beers(beer_id, 1)[0]
